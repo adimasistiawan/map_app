@@ -9,20 +9,37 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: GMap(),
+      home: Gmap(),
     );
   }
 }
 
-class GMap extends StatelessWidget {
-  Completer<GoogleMapController> _controller = Completer();
+class Gmap extends StatefulWidget {
+  @override
+  _GmapState createState() => _GmapState();
+}
 
-  static const LatLng _center = const LatLng(45.521563, -122.677433);
+class _GmapState extends State<Gmap> {
+  List<Marker> dataMarker = [];
 
-  void _onMapCreated(GoogleMapController controller) {
-    _controller.complete(controller);
+  @override
+  void initState() {
+    super.initState();
+    setState(() {
+      dataMarker.add(
+        Marker(
+            markerId: MarkerId('Test'),
+            position: LatLng(-8.66123, 115.1954642),
+            infoWindow: InfoWindow(title: "Mitra IT")),
+      );
+      dataMarker.add(Marker(
+          markerId: MarkerId('Test1'),
+          position: LatLng(-8.6673892, 115.1960675),
+          infoWindow: InfoWindow(title: "Rumah")));
+    });
   }
 
+  GoogleMapController _mapcontroller;
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -30,12 +47,17 @@ class GMap extends StatelessWidget {
         title: Text('Map App'),
       ),
       body: GoogleMap(
-        onMapCreated: _onMapCreated,
+        onMapCreated: (controller) {
+          setState(() {
+            _mapcontroller = controller;
+          });
+        },
         mapType: MapType.normal,
         initialCameraPosition: CameraPosition(
           target: LatLng(-8.650000, 115.216667),
           zoom: 14.0,
         ),
+        markers: Set.from(dataMarker),
       ),
     );
   }

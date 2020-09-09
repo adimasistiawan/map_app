@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "667139900046",
+    "firebase_url": "https://mapapp-7ba03.firebaseio.com",
+    "project_id": "mapapp-7ba03",
+    "storage_bucket": "mapapp-7ba03.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:667139900046:android:272b02837500d6ad073fdf",
+        "android_client_info": {
+          "package_name": "com.example.map_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "667139900046-qknbunedsc1epob4b9r4v2kne7sha2j8.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAcffjsdmsvlH-zafa2rbUhUqfqWXw8FN0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "667139900046-qknbunedsc1epob4b9r4v2kne7sha2j8.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
