@@ -25,91 +25,222 @@ class _GmapState extends State<Gmap> {
   List<Marker> dataMarker = <Marker>[];
   GoogleMapController _mapcontroller;
   Completer<GoogleMapController> _controller = Completer();
+
   String test;
+  String _name;
+  final GlobalKey<FormState> formkey = GlobalKey<FormState>();
   var markers = [];
-  @override
-  void initState() {
-    super.initState();
-    getLocations();
-    setState(() {
-      // dataMarker.add(
-      //   Marker(
-      //       markerId: MarkerId('Test'),
-      //       position: LatLng(-8.66123, 115.1954642),
-      //       infoWindow: InfoWindow(title: "Mitra IT")),
-      // );
-      // dataMarker.add(Marker(
-      //     markerId: MarkerId('Test1'),
-      //     position: LatLng(-8.6673892, 115.1960675),
-      //     infoWindow: InfoWindow(title: "Rumah")));
-    });
-  }
 
-  getLocations() {
-    markers = [];
-    Firestore.instance.collection('markers').getDocuments().then((value) {
-      if (value.documents.isNotEmpty) {
-        setState(() {
-          test = value.documents.length.toString();
+  void popup(BuildContext context, latitude, longitude) {
+    final textcontroller = TextEditingController();
+    showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Text('Add Location'),
+            content: Container(
+              height: 120,
+              child: Form(
+                  key: formkey,
+                  child: Column(
+                    children: [
+                      TextFormField(
+                        controller: textcontroller,
+                        decoration: InputDecoration(labelText: 'Location name'),
+                        onSaved: (input) => _name = input,
+                        validator: (value) {
+                          if (value.isEmpty) {
+                            return "required";
+                          }
+                        },
+                      ),
+                    ],
+                  )),
+            ),
+            actions: [
+              FlatButton(
+                child: Text('Add'),
+                onPressed: () {
+                  SaveLocation(latitude, longitude);
+                  textcontroller.clear();
+                },
+              ),
+              FlatButton(
+                child: Text("Cancel"),
+                onPressed: () {
+                  textcontroller.clear();
+                  Navigator.of(context).pop();
+                },
+              )
+            ],
+          );
         });
-        print(value.documents);
-        for (var i = 0; i < value.documents.length; i++) {
-          markers.add(value.documents[i].data);
-          initMarker(value.documents[i].data, value.documents[i].documentID);
-        }
-      }
-    });
   }
 
-  void initMarker(data, dataid) {
-    // if (data == null) {
-    //   dataMarker[dads] = null;
-    // }
-    setState(() {
-      dataMarker.add(Marker(
-          markerId: MarkerId(dataid),
-          position:
-              LatLng(data['coordinate'].latitude, data['coordinate'].longitude),
-          infoWindow: InfoWindow(title: data['location'])));
-    });
+  void edit(BuildContext context, name, id) {
+    final editcontroller = TextEditingController(text: name);
+    showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Text('Add Location'),
+            content: Container(
+              height: 120,
+              child: Form(
+                  key: formkey,
+                  child: Column(
+                    children: [
+                      TextFormField(
+                        controller: editcontroller,
+                        decoration: InputDecoration(labelText: 'Location name'),
+                        onSaved: (input) => _name = input,
+                        validator: (value) {
+                          if (value.isEmpty) {
+                            return "required";
+                          }
+                        },
+                      ),
+                    ],
+                  )),
+            ),
+            actions: [
+              FlatButton(
+                child: Text('Save'),
+                onPressed: () {
+                  updateLocation(id);
+                  editcontroller.clear();
+                  _mapcontroller.hideMarkerInfoWindow(MarkerId(id));
+                },
+              ),
+              FlatButton(
+                child: Text("Cancel"),
+                onPressed: () {
+                  editcontroller.clear();
+                  Navigator.of(context).pop();
+                },
+              )
+            ],
+          );
+        });
+  }
 
-    // var markerIdVal = dataid;
-    // final MarkerId markerId = MarkerId(markerIdVal);
-    // debugPrint(data);
-    // // creating a new MARKER
-    // final Marker marker = Marker(
-    //   markerId: markerId,
-    //   position:
-    //       LatLng(data['coordinate'].latitude, data['coordinate'].longtitude),
-    //   infoWindow: InfoWindow(title: data['location']),
-    // );
+  Future<void> SaveLocation(lat, lng) async {
+    final formstate = formkey.currentState;
+    if (formstate.validate()) {
+      Navigator.of(context).pop();
+      formstate.save();
+      await Firestore.instance.collection('markers').add({
+        'location': _name,
+        'coordinate': new GeoPoint(lat, lng),
+        'date': FieldValue.serverTimestamp()
+      });
+    }
+  }
 
-    // setState(() {
-    //   // adding a new marker to map
+  Future<void> updateLocation(id) async {
+    final formstate = formkey.currentState;
+    if (formstate.validate()) {
+      Navigator.of(context).pop();
+      formstate.save();
+      await Firestore.instance.collection('markers').document(id).updateData({
+        'location': _name,
+      });
+      _mapcontroller.showMarkerInfoWindow(MarkerId(id));
+    }
+  }
 
-    //   dataMarker[markerId] = marker;
-    // });
+  Future<void> deleteLocation(id) async {
+    await Firestore.instance.collection("markers").document(id).delete();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Map App'),
-      ),
-      body: GoogleMap(
-        onMapCreated: (GoogleMapController controller) {
-          setState(() {
-            _mapcontroller = controller;
-          });
-        },
-        mapType: MapType.normal,
-        initialCameraPosition: CameraPosition(
-          target: LatLng(-8.650000, 115.216667),
-          zoom: 14.0,
+        appBar: AppBar(
+          title: Text('Map App'),
         ),
-        markers: Set<Marker>.of(dataMarker),
-      ),
-    );
+        body: Stack(
+          children: [
+            StreamBuilder(
+              stream: Firestore.instance.collection('markers').snapshots(),
+              builder: (context, snapshot) {
+                dataMarker.clear();
+                if (!snapshot.hasData) {
+                  return Text("Loading..");
+                }
+                if (snapshot.data.documents.isNotEmpty) {
+                  for (var i = 0; i < snapshot.data.documents.length; i++) {
+                    markers.add(snapshot.data.documents[i].data);
+                    dataMarker.add(Marker(
+                        markerId:
+                            MarkerId((snapshot.data.documents[i].documentID)),
+                        onTap: () {
+                          showModalBottomSheet(
+                              barrierColor: Colors.white.withOpacity(0),
+                              context: context,
+                              builder: (context) {
+                                return Container(
+                                  height: 120,
+                                  child: Container(
+                                    child: Column(
+                                      children: [
+                                        ListTile(
+                                          leading: Icon(Icons.edit),
+                                          title: Text("Edit"),
+                                          onTap: () {
+                                            Navigator.pop(context);
+                                            edit(
+                                                context,
+                                                snapshot.data.documents[i]
+                                                    .data['location'],
+                                                (snapshot.data.documents[i]
+                                                    .documentID));
+                                          },
+                                        ),
+                                        ListTile(
+                                          leading: Icon(Icons.delete),
+                                          title: Text("Delete"),
+                                          onTap: () {
+                                            deleteLocation(snapshot
+                                                .data.documents[i].documentID);
+                                            Navigator.pop(context);
+                                          },
+                                        )
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              });
+                        },
+                        position: LatLng(
+                            (snapshot
+                                .data.documents[i].data['coordinate'].latitude),
+                            (snapshot.data.documents[i].data['coordinate']
+                                .longitude)),
+                        infoWindow: InfoWindow(
+                          title: (snapshot.data.documents[i].data['location']),
+                        )));
+                  }
+                }
+                return new GoogleMap(
+                  onMapCreated: (GoogleMapController controller) {
+                    setState(() {
+                      _mapcontroller = controller;
+                    });
+                  },
+                  onTap: (coordinate) {
+                    popup(context, coordinate.latitude, coordinate.longitude);
+                  },
+                  mapType: MapType.normal,
+                  initialCameraPosition: CameraPosition(
+                    target: LatLng(-8.650000, 115.216667),
+                    zoom: 14.0,
+                  ),
+                  markers: Set<Marker>.of(dataMarker),
+                );
+              },
+            )
+          ],
+        ));
   }
 }
