@@ -36,11 +36,9 @@ class _GmapState extends State<Gmap> {
   List<LatLng> routeCoords = [];
   PolylinePoints polylinePoints = PolylinePoints();
   Map<PolylineId, Polyline> polylines = {};
-  String googleAPiKey = "AIzaSyDtAHkHxL4Sv5GvJranFwSJwrz33aRoTpc";
-  GoogleMapPolyline googleMapPolyline =
-      new GoogleMapPolyline(apiKey: "AIzaSyDrJN7HOsyZLw6_PucyKTx7LTaMKjEenvg");
+  String googleAPiKey = "AIzaSyAK32XxHYjxr9p9wv_K_wE2-2Xgd563bE4";
   PolylineResult result;
-  List<LatLng> result2;
+
   // LatLng t1 = LatLng(-8.640705240362454, 115.20013488829136);
   // LatLng t2 = LatLng(-8.6673892, 115.1960675);
   // LatLng t3 = LatLng(-8.66123, 115.1954642);
@@ -49,33 +47,32 @@ class _GmapState extends State<Gmap> {
   @override
   void initState() {
     super.initState();
-    drawRoute();
+    getRoute();
     setState(() {});
   }
 
-  drawRoute() async {
+  getRoute() async {
     // ------- Flutter map polyline--------------
-    result = await polylinePoints.getRouteBetweenCoordinates(googleAPiKey,
-        PointLatLng(-8.66123, 115.1954642), PointLatLng(-8.65706, 115.2157885),
-        travelMode: TravelMode.driving);
-    print(result);
-    if (result.points.isNotEmpty) {
-      // jika result tidak kosong akan muncul draw route
-      result.points.forEach((PointLatLng point) {
-        routeCoords.add(LatLng(point.latitude, point.longitude));
-      });
-      PolylineId id = PolylineId("poly");
-      Polyline polyline =
-          Polyline(polylineId: id, color: Colors.red, points: routeCoords);
-      polylines[id] = polyline;
-    } else {
-      // jika result kosong akan membuat polyline biasa
-      PolylineId id = PolylineId("poly");
-      Polyline polyline = Polyline(polylineId: id, color: Colors.red, points: [
-        LatLng(-8.66123, 115.1954642),
-        LatLng(-8.65706064452849, 115.2157885953784)
-      ]);
-      polylines[id] = polyline;
+    final value = await Firestore.instance
+        .collection("markers")
+        .orderBy('date', descending: false)
+        .getDocuments();
+    if (value.documents.isNotEmpty) {
+      for (var i = 0; i < value.documents.length; i++) {
+        point.add(PolylineWayPoint(
+            location: value.documents[i].data['coordinate'].latitude
+                    .toString() +
+                ", " +
+                value.documents[i].data['coordinate'].longitude.toString()));
+      }
+      var j = value.documents.length - 1;
+      PointLatLng a = PointLatLng(
+          value.documents[0].data['coordinate'].latitude,
+          value.documents[0].data['coordinate'].longitude);
+      PointLatLng b = PointLatLng(
+          value.documents[j].data['coordinate'].latitude,
+          value.documents[j].data['coordinate'].longitude);
+      setRoute(a, b, point);
     }
 
     // ------- Google map polyline-----------
@@ -88,6 +85,25 @@ class _GmapState extends State<Gmap> {
     // Polyline polyline =
     //     Polyline(polylineId: id, color: Colors.red, points: result2);
     // polylines[id] = polyline;
+  }
+
+  setRoute(origin, destination, wayp) async {
+    result = await polylinePoints.getRouteBetweenCoordinates(
+        googleAPiKey, origin, destination,
+        travelMode: TravelMode.driving);
+    print(result);
+    if (result.points.isNotEmpty) {
+      // jika result tidak kosong akan muncul draw route
+      result.points.forEach((PointLatLng pointcoor) {
+        routeCoords.add(LatLng(pointcoor.latitude, pointcoor.longitude));
+      });
+      PolylineId id = PolylineId("poly");
+      Polyline polyline =
+          Polyline(polylineId: id, color: Colors.red, points: routeCoords);
+      setState(() {
+        polylines[id] = polyline;
+      });
+    }
   }
 
   void popup(BuildContext context, latitude, longitude) {
@@ -313,6 +329,7 @@ class _GmapState extends State<Gmap> {
                 // PointLatLng b = PointLatLng(
                 //     snapshot.data.documents[j].data['coordinate'].latitude,
                 //     snapshot.data.documents[j].data['coordinate'].longitude);
+
               }
 
               return new GoogleMap(
