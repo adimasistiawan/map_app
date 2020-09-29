@@ -1,10 +1,22 @@
+import 'dart:isolate';
+import 'dart:ui';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:google_map_polyline/google_map_polyline.dart';
+import 'package:flutter_geofence/geofence.dart';
+// import 'package:geofence/geofence.dart';
+// import 'package:geofence/geofence_event.dart';
+// import 'package:geofence/geofence_region.dart';
+// import 'package:geofence/location.dart';
+
+import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:async';
 import 'package:intl/intl.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
+import 'package:location/location.dart';
+
+import 'toast.dart';
 
 void main() => runApp(MyApp());
 
@@ -40,12 +52,91 @@ class _GmapState extends State<Gmap> {
   String googleAPiKey = "AIzaSyAK32XxHYjxr9p9wv_K_wE2-2Xgd563bE4";
   PolylineResult result;
 
-
+  Map<CircleId, Circle> circles = {};
+  var currentlocation;
+  bool maptoggle = false;
+  bool buttonhide = false;
+  Location location;
+  double distance;
   @override
   void initState() {
     super.initState();
-    setState(() {});
+
+    //flutter_geofence
+    // initPlatformState();
+    // Geofence.requestPermissions();
+    // Geolocation location = Geolocation(
+    //     latitude: -8.6678318, longitude: 115.1965159, radius: 25, id: "Rumah");
+    // Geofence.addGeolocation(location, GeolocationEvent.entry).then((onValue) {
+    //   print("great success");
+    // }).catchError((onError) {
+    //   print("great failure");
+    // });
+
+    getCurrentLocation();
+    location = new Location();
+    location.onLocationChanged().listen((LocationData cLoc) {
+      if (circles[CircleId("rumah")] != null) {
+        setState(() {
+          distance = distanceBetween(
+              cLoc.latitude,
+              cLoc.longitude,
+              circles[CircleId("rumah")].center.latitude,
+              circles[CircleId("rumah")].center.longitude);
+        });
+        if (distance > circles[CircleId("rumah")].radius) {
+          showToast('Keluar', Colors.red);
+        } else {
+          showToast('Masuk', Colors.green);
+        }
+      }
+    });
   }
+
+  getCurrentLocation() async {
+    await GeolocatorPlatform.instance.getCurrentPosition().then((value) {
+      setState(() {
+        currentlocation = value;
+        maptoggle = true;
+        setCircles();
+      });
+    });
+  }
+
+  // Future<void> initPlatformState() async {
+  //   // If the widget was removed from the tree while the asynchronous platform
+  //   // message was in flight, we want to discard the reply rather than calling
+  //   // setState to update our non-existent appearance.
+
+  //   Geofence.initialize();
+  //   Geofence.startListening(GeolocationEvent.entry, (entry) {
+  //     showToast('Masuk', Colors.green);
+  //   });
+
+  //   Geofence.startListening(GeolocationEvent.exit, (entry) {
+  //     showToast('Keluar', Colors.red);
+  //   });
+  // }
+
+  //geofence
+  // static void callback(Location l, GeofenceEvent e) async {
+  //   print('Location $l Event: $e');
+  //   final SendPort send =
+  //       IsolateNameServer.lookupPortByName('geofencing_send_port');
+  //   send?.send(e.toString());
+  // }
+
+  // Future<void> initGeofence() async {
+  //   try {
+  //     bool isInitialized = await Geofence.initialize();
+  //     print("Geofence plugin initialzed : $isInitialized");
+  //     var region = GeofenceRegion(Location(-8.6678318, 115.1965159), 24);
+  //     bool geofenceAdded = await Geofence.registerGeofence(region, callback);
+  //     //await Geofence.unRegisterGeofence();
+  //   } catch (e) {
+  //     print(e);
+  //   }
+  // }
 
   getRoute() async {
     // ------- Flutter map polyline--------------
@@ -65,7 +156,6 @@ class _GmapState extends State<Gmap> {
               value.documents[i + 1].data['coordinate'].longitude);
           String c = value.documents[i].data['location'];
           setRoute(a, b, c);
-          
         }
       }
     }
@@ -89,6 +179,16 @@ class _GmapState extends State<Gmap> {
         polylines[id] = polyline;
       });
     }
+  }
+
+  void setCircles() {
+    var circle = Circle(
+        circleId: CircleId("rumah"),
+        center: LatLng(-8.6678318, 115.1965159),
+        radius: 20,
+        fillColor: Color.fromRGBO(245, 243, 243, 100),
+        strokeWidth: 2);
+    circles[CircleId("rumah")] = circle;
   }
 
   void popup(BuildContext context, latitude, longitude) {
@@ -218,7 +318,7 @@ class _GmapState extends State<Gmap> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Map App'),
+        title: Text("Map App"),
       ),
       body: Stack(
         children: [
@@ -230,7 +330,7 @@ class _GmapState extends State<Gmap> {
             builder: (context, snapshot) {
               dataMarker.clear();
               Timestamp time = new Timestamp(2019, 3);
-              if (!snapshot.hasData) {
+              if (!snapshot.hasData && !maptoggle) {
                 return Text("Loading..");
               }
               if (snapshot.data.documents.isNotEmpty) {
@@ -294,11 +394,9 @@ class _GmapState extends State<Gmap> {
                             ")"),
                       )));
                 }
-                
-
               }
 
-              return new GoogleMap(
+              return GoogleMap(
                 onMapCreated: (GoogleMapController controller) {
                   setState(() {
                     _mapcontroller = controller;
@@ -312,10 +410,16 @@ class _GmapState extends State<Gmap> {
                     : Set<Polyline>.of(emptypolylines.values),
                 mapType: MapType.normal,
                 initialCameraPosition: CameraPosition(
-                  target: LatLng(-8.650000, 115.216667),
+                  target: currentlocation == null
+                      ? LatLng(0.0, 0.0)
+                      : LatLng(
+                          currentlocation.latitude, currentlocation.longitude),
                   zoom: 14.0,
                 ),
                 markers: Set<Marker>.of(dataMarker),
+                circles: Set<Circle>.of(circles.values),
+                myLocationEnabled: true,
+                myLocationButtonEnabled: true,
               );
             },
           ),

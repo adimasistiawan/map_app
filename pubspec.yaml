@@ -25,6 +25,10 @@ dependencies:
   intl: ^0.16.1
   flutter_polyline_points: ^0.2.3
   google_map_polyline:
+  geolocator: ^6.0.0+4
+  flutter_geofence: ^0.2.1
+  fluttertoast: ^7.0.4
+  location: ^2.3.5
   
 
   # The following adds the Cupertino Icons font to your application.
